@@ -9,6 +9,11 @@ const app = express();
 // Le PORT est déjà défini par l'environnement ou 3000
 const PORT = process.env.PORT || 3000;
 
+// --- ERREUR DE BLOCAGE AJOUTÉE ICI ---
+// Cette variable n'est pas définie dans l'environnement.
+// ESLint ne peut pas la corriger automatiquement et devrait bloquer le commit.
+console.log(variableQuiNExistePas);
+
 // Middleware (Logiciel intermédiaire)
 app.use(cors()); // Autorise les requêtes de domaines différents
 app.use(express.json()); // Permet à Express de lire le corps des requêtes JSON
@@ -27,6 +32,6 @@ app.get("/", (req: Request, res: Response) => {
 
 
 // Démarrage du serveur
-app.listen  (PORT, () => {
+app.listen(PORT, () => {
   console.log(`✅ Server is running on port ${PORT}`);
-;
+});
