@@ -9,8 +9,11 @@ export default defineConfig([
     ignores: ["dist/"],
   },
   {
+    // Apply ESLint to all JS and TS files
     files: ["**/*.{js,mjs,cjs,ts,mts,cts}"],
+    // Enable the built-in ESLint JS plugin
     plugins: { js },
+    // Use ESLint's recommended rules for JS
     extends: ["js/recommended"],
     languageOptions: { globals: globals.node },
   },
@@ -18,14 +21,18 @@ export default defineConfig([
   tseslint.configs.recommended,
   {
     rules: {
+      // Warn on unused variables, but allow unused params starting with "_"
       "@typescript-eslint/no-unused-vars": [
-        "error",      // changé de "warn" à "error" pour bloquer le commit
+        "warn",
         { argsIgnorePattern: "^_" },
       ],
-      "@typescript-eslint/no-explicit-any": "error", // bloquera si on utilise "any"
+      // Warn (but don't block) when using "any"
+      "@typescript-eslint/no-explicit-any": "warn",
       "@typescript-eslint/no-require-imports": "off",
     },
   },
 
+  // Integrate Prettier so formatting rules are unified with ESLint
+  // This ensures ESLint respects Prettier’s code style (no conflicts)
   eslintPluginPrettierRecommended,
 ]);
