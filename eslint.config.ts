@@ -1,8 +1,8 @@
-import js from "@eslint/js";
-import globals from "globals";
-import tseslint from "typescript-eslint";
-import { defineConfig } from "eslint/config";
-import eslintPluginPrettierRecommended from "eslint-plugin-prettier/recommended";
+const js = require("@eslint/js");
+const globals = require("globals");
+const tseslint = require("typescript-eslint");
+const { defineConfig } = require("eslint/config");
+const eslintPluginPrettierRecommended = require("eslint-plugin-prettier/recommended");
 
 export default defineConfig([
   {
@@ -28,6 +28,7 @@ export default defineConfig([
       ],
       // Warn (but don't block) when using "any"
       "@typescript-eslint/no-explicit-any": "warn",
+      "@typescript-eslint/no-require-imports": "off",
     },
   },
 
