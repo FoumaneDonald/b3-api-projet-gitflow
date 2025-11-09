@@ -1,16 +1,23 @@
-const express = require("express");
-const cors = require("cors");
+const app = require("./app");
+const http = require("http");
 
-const app = express();
 const PORT = process.env.PORT || 3000;
 
-app.use(cors());
-app.use(express.json());
+const server = http.createServer(app);
 
-app.get("/", (res: any) => {
-  res.send("hello");
-});
+process
+  .on("uncaughtException", (err) => {
+    console.error(err.message, "Uncaught Exception thrown");
+    server.close();
+  })
+  .on("unhandledRejection", (reason) => {
+    console.error(reason, "Unhandled Rejection at Promise");
+  });
 
-app.listen(PORT, () => {
-  console.log(`Server is running on port ${PORT}`);
-});
+const main = async () => {
+  await server.listen(PORT, () => {
+    console.log(`Server is running on port ${PORT}`);
+  });
+};
+
+main();
