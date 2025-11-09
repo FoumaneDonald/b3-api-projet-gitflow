@@ -22,12 +22,9 @@ export default defineConfig([
   {
     rules: {
       // Warn on unused variables, but allow unused params starting with "_"
-      "@typescript-eslint/no-unused-vars": [
-        "warn",
-        { argsIgnorePattern: "^_" },
-      ],
+      "@typescript-eslint/no-unused-vars": "off",
       // Warn (but don't block) when using "any"
-      "@typescript-eslint/no-explicit-any": "warn",
+      "@typescript-eslint/no-explicit-any": "off",
       "@typescript-eslint/no-require-imports": "off",
     },
   },

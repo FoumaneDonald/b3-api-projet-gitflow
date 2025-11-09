@@ -8,9 +8,14 @@
     "dev": "nodemon src/server.ts",
     "build": "tsc",
     "start": "ts-node src/server.ts",
-    "lint": "eslint 'src/**/*.{ts,tsx,js,jsx}'",
-    "lint:fix": "eslint 'src/**/*.{ts,tsx,js,jsx}' --fix",
-    "prepare": "husky install"
+    "lint": "eslint",
+    "prepare": "husky"
+  },
+  "lint-staged": {
+    "*.{ts,tsx,js,jsx}": [
+      "eslint --max-warnings=0",
+      "prettier --check"
+    ]
   },
   "repository": {
     "type": "git",
@@ -42,6 +47,7 @@
     "typescript-eslint": "^8.46.3"
   },
   "dependencies": {
+    "body-parser": "^2.2.0",
     "cors": "^2.8.5",
     "express": "^5.1.0",
     "nodemon": "^3.1.10",
