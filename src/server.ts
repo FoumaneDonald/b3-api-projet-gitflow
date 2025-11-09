@@ -1,21 +1,23 @@
-import express from "express";
-import projectRoutes from "./routes/project"; // <-- note le .js ici si tu compiles avec ts-node
+const app = require("./app");
+const http = require("http");
 
-const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Middleware pour lire le JSON dans le corps des requêtes
-app.use(express.json());
+const server = http.createServer(app);
 
-// Utiliser les routes du projet
-app.use("/api/projects", projectRoutes);
+process
+  .on("uncaughtException", (err) => {
+    console.error(err.message, "Uncaught Exception thrown");
+    server.close();
+  })
+  .on("unhandledRejection", (reason) => {
+    console.error(reason, "Unhandled Rejection at Promise");
+  });
 
-// Route test de base
-app.get("/", (req, res) => {
-  res.send("✅ API is running...");
-});
+const main = async () => {
+  await server.listen(PORT, () => {
+    console.log(`Server is running on port ${PORT}`);
+  });
+};
 
-// Lancer le serveur
-app.listen(PORT, () => {
-  console.log(`🚀 Server running on http://localhost:${PORT}`);
-});
+main();
