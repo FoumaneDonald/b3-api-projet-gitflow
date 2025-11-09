@@ -1,141 +1,75 @@
-name: LLM Review & Notify
+name: LLM Code Review & Notification
 
-# Déclenche sur ouverture et synchronisation des PR vers develop
 on:
   pull_request:
     types: [opened, synchronize]
     branches: [develop]
 
-permissions:
-  # On a besoin d'écrire des commentaires sur la PR
-  pull-requests: write
-  contents: read
-
 jobs:
   review_and_notify:
     runs-on: ubuntu-latest
-    name: LLM review & email notification
+
+    env:
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      MAIL_USERNAME: ${{ secrets.MAIL_USERNAME }}
+      MAIL_PASSWORD: ${{ secrets.MAIL_PASSWORD }}
+      TEAM_EMAIL_LIST: ${{ secrets.TEAM_EMAIL_LIST }}
+      LLM_API_URL: https://generativelanguage.googleapis.com/v1beta/{model=models/*}:generateContent
+
     steps:
-
-      - name: Checkout (full history)
+      - name: Checkout repository
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
-      - name: Get PR info
-        id: pr_info
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const pr = context.payload.pull_request;
-            return {
-              number: pr.number,
-              headRef: pr.head.ref,
-              headSha: pr.head.sha,
-              author: pr.user.login
-            };
-
-      - name: Get diff of the PR (raw diff)
-        id: get_diff
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const owner = context.repo.owner;
-            const repo = context.repo.repo;
-            const num = context.payload.pull_request.number;
-            // Request the PR as diff text
-            const response = await github.request("GET /repos/{owner}/{repo}/pulls/{pull_number}", {
-              owner,
-              repo,
-              pull_number: num,
-              headers: { accept: "application/vnd.github.v3.diff" }
-            });
-            // response.data contains the raw diff text
-            core.setOutput("pr_diff", response.data || "");
-            return { length: (response.data || "").length };
-
-      - name: Save diff to file
-        if: always()
+      - name: Get diff of the Pull Request
+        id: diff
         run: |
-          echo "${{ steps.get_diff.outputs.pr_diff }}" > pr.diff || true
-          echo "Diff size: $(wc -c < pr.diff) bytes"
-      
-      - name: Call LLM (Gemini) with the diff
-        id: call_llm
-        env:
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-          # Remplace LLM_API_URL par l'endpoint réel fourni par le Lead / provider
-          LLM_API_URL: https://generativelanguage.googleapis.com/v1beta/{model=models/*}:generateContent
-        run: |
-          # Prépare le prompt
-          cat > prompt.txt <<'PROMPT'
-Tu es un relecteur de code expert. Analyse le diff suivant. Si le code est correct, fournis des pistes d'amélioration. Si le code contient des bugs ou risques (sécurité, performances, logique, erreurs de typings), liste-les clairement et propose des corrections. Réponds en français, avec sections "Résumé", "Problèmes trouvés", "Suggestions", et "Exemples de correctifs".
-PR: #${{ steps.pr_info.outputs.number }}
-Auteur: @${{ steps.pr_info.outputs.author }}
-DIFF:
-PROMPT
-          cat pr.diff >> prompt.txt
-
-          # Appel HTTP à l'API LLM — adapter méthode/format au provider réel.
-          # Exemple curl POST JSON (ajuste selon l'API réelle).
-          RESPONSE_FILE=llm_response.txt
-          curl -s -X POST "${LLM_API_URL}" \
-            -H "Authorization: Bearer ${GEMINI_API_KEY}" \
-            -H "Content-Type: application/json" \
-            -d "$(jq -n --arg p "$(sed 's/"/\\"/g' prompt.txt)" '{prompt: $p, max_tokens: 1200}')" \
-            > $RESPONSE_FILE || true
-
-          echo "LLM response saved to $RESPONSE_FILE"
-          echo "LLM_OUTPUT<<EOF" >> $GITHUB_OUTPUT
-          cat $RESPONSE_FILE
+          git fetch origin develop
+          git diff origin/develop...HEAD > diff.txt
+          echo "diff<<EOF" >> $GITHUB_OUTPUT
+          cat diff.txt >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
 
-      - name: Read LLM response
-        id: llm_read
+      - name: Call Gemini API for code review
+        id: call_llm
         run: |
-          echo "---- LLM response preview ----"
-          head -c 4000 llm_response.txt || true
-          echo "-------------------------------"
+          REVIEW=$(curl -s -X POST "$LLM_API_URL" \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Bearer $GEMINI_API_KEY" \
+            -d "{
+              'contents': [{'parts':[{'text': 'Tu es un relecteur de code expert. Analyse ce diff :\n${{ steps.diff.outputs.diff }}\nSi le code est bon, donne des pistes d’amélioration. S’il contient des bugs, liste-les. Réponds en français.'}]}]
+            }" | jq -r '.candidates[0].content.parts[0].text')
+          echo "review=$REVIEW" >> $GITHUB_OUTPUT
 
-      - name: Post comment on PR with LLM response
+      - name: Comment on Pull Request
         uses: actions/github-script@v7
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
-            const num = context.payload.pull_request.number;
-            const author = context.payload.pull_request.user.login;
-            const fs = require('fs');
-            let body = fs.existsSync('llm_response.txt') ? fs.readFileSync('llm_response.txt', 'utf8') : "Aucune réponse LLM trouvée.";
-            // tronquer si très long
-            if (body.length > 65000) {
-              body = body.slice(0, 65000) + "\n\n(Réponse tronquée)";
-            }
-            const comment = `@${author} — Revue automatique (IA) de la PR #${num} :\n\n${body}`;
-            await github.rest.issues.createComment({
+            const review = `${{ steps.call_llm.outputs.review }}`;
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
               owner: context.repo.owner,
               repo: context.repo.repo,
-              issue_number: num,
-              body: comment
+              body: `🤖 **Revue automatique par IA (Gemini)** pour @${{ github.actor }} :\n\n${review}`
             });
 
-      - name: Send email to team with LLM review
+      - name: Send email notification
         uses: dawidd6/action-send-mail@v3
         with:
-          # SMTP settings (exemple Gmail). Adapter si nécessaire.
           server_address: smtp.gmail.com
           server_port: 587
           username: ${{ secrets.MAIL_USERNAME }}
           password: ${{ secrets.MAIL_PASSWORD }}
-          subject: "Revue LLM pour PR #${{ steps.pr_info.outputs.number }} par @${{ steps.pr_info.outputs.author }}"
-          body: |
-            Bonjour équipe,
-
-            Une revue automatique générée par l'IA vient d'être postée pour la PR #${{ steps.pr_info.outputs.number }} (auteur: @${{ steps.pr_info.outputs.author }}).
-
-            --- Réponse IA ---
-            ${{ steps.call_llm.outputs.GITHUB_OUTPUT || '' }}
-
-            ---
-            Ce message est automatique.
+          subject: "Revue IA - PR #${{ github.event.pull_request.number }} par @${{ github.actor }}"
           to: ${{ secrets.TEAM_EMAIL_LIST }}
-          from: ${{ secrets.MAIL_USERNAME }}
+          from: "LLM Review Bot <${{ secrets.MAIL_USERNAME }}>"
+          body: |
+            Bonjour équipe 👋
+
+            Une nouvelle Pull Request vient d’être ouverte par @${{ github.actor }}.
+
+            Voici la revue générée par l’IA :
+
+            ${{ steps.call_llm.outputs.review }}
+
+            ➤ Voir la PR ici : ${{ github.event.pull_request.html_url }}
