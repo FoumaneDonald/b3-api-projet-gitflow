@@ -1,21 +1,23 @@
-import express from "express";
-import cors from "cors";
-import projectRoutes from "./routes/project"; // Assure-toi que le chemin est correct
+const app = require("./app");
+const http = require("http");
 
-const app = express();
 const PORT = process.env.PORT || 3000;
 
-app.use(cors());
-app.use(express.json());
+const server = http.createServer(app);
 
-// === Route racine ===
-app.get("/", (req, res) => {
-  res.send("hello");
-});
+process
+  .on("uncaughtException", (err) => {
+    console.error(err.message, "Uncaught Exception thrown");
+    server.close();
+  })
+  .on("unhandledRejection", (reason) => {
+    console.error(reason, "Unhandled Rejection at Promise");
+  });
 
-// === Routes projets ===
-app.use("/projects", projectRoutes);
+const main = async () => {
+  await server.listen(PORT, () => {
+    console.log(`Server is running on port ${PORT}`);
+  });
+};
 
-app.listen(PORT, () => {
-  console.log(`Server is running on port ${PORT}`);
-});
+main();
