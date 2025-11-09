@@ -1,0 +1,32 @@
+# .pre-commit-config.yaml
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-added-large-files
+
+  - repo: https://github.com/pre-commit/mirrors-prettier
+    rev: v4.0.0-alpha.8
+    hooks:
+      - id: prettier
+        types_or:
+          [javascript, jsx, ts, tsx, json, css, scss, html, yaml, markdown]
+
+  # NOUVELLE SECTION À AJOUTER
+  - repo: https://github.com/pre-commit/mirrors-eslint
+    rev: v9.39.1 # Assurez-vous que cette version correspond à celle dans votre package.json
+    hooks:
+      - id: eslint
+        types: [ts, tsx] # Cible uniquement les fichiers TypeScript
+        args: [--fix] # Tente de corriger les erreurs automatiquement
+        additional_dependencies:
+          # === IMPORTANT ===
+          # Listez ici TOUS vos plugins et configurations ESLint
+          # Exemple :
+          - "@typescript-eslint/parser"
+          - "@typescript-eslint/eslint-plugin"
+          - "eslint-plugin-prettier"
+          - "eslint-config-prettier"

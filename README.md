@@ -1,6 +1,6 @@
 # Projet API Étudiant — Git Flow / DevOps TP
 
-> Stack: Node.js + Express + TypeScript + Zod  
+> Stack: Node.js + Express + TypeScript + Zod
 > Objectif pédagogique: maîtriser le versionning Git Flow, la qualité du code et l’automatisation CI/CD avec GitHub Actions.
 
 ## Sommaire
@@ -22,10 +22,11 @@
 
 ## Objectif du projet
 
-Ce projet consiste à développer une API REST pour gérer les soumissions de projets étudiants.  
+Ce projet consiste à développer une API REST pour gérer les soumissions de projets étudiants.
 Les données sont stockées dans un simple fichier db.json sans base de données.
 
 L’objectif principal est de :
+
 - Appliquer la méthode Git Flow
 - Mettre en place des hooks de validation de code
 - Automatiser les revues de code par IA
@@ -71,22 +72,26 @@ projet-api/
 ## Installation et exécution
 
 1. Cloner le projet
+
 ```bash
 git clone <repo-url>
 cd projet-api
 ```
 
 2. Installer les dépendances
+
 ```bash
 npm install
 ```
 
 3. Lancer en mode développement
+
 ```bash
 npm run dev
 ```
 
 4. Compiler pour la production
+
 ```bash
 npm run build
 npm start
@@ -97,6 +102,7 @@ Le serveur démarre par défaut sur http://localhost:3000
 ## Linting & Formatage
 
 ### Linter avec ESLint
+
 ```bash
 npm run lint
 ```
@@ -104,6 +110,7 @@ npm run lint
 Corrige automatiquement les erreurs simples avec l’option --fix.
 
 ### Formatage avec Prettier
+
 Prettier est intégré directement via ESLint (eslint-plugin-prettier/recommended).
 
 - Les erreurs de formatage apparaissent comme des erreurs ESLint.
@@ -118,14 +125,15 @@ Les hooks Git sont configurés pour bloquer tout commit qui ne respecte pas les 
 
 ## Workflow Git Flow
 
-| Branche   | Rôle                                |
-| --------- | ----------------------------------- |
-| main      | Version stable / release            |
-| develop   | Branche d’intégration               |
-| feature/* | Branche de développement individuel |
-| hotfix/*  | Correctifs urgents sur main         |
+| Branche    | Rôle                                |
+| ---------- | ----------------------------------- |
+| main       | Version stable / release            |
+| develop    | Branche d’intégration               |
+| feature/\* | Branche de développement individuel |
+| hotfix/\*  | Correctifs urgents sur main         |
 
 Exemple de cycle :
+
 ```bash
 git switch develop
 git switch -c feature/add-post-project
