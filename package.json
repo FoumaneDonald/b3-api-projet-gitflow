@@ -1,9 +1,41 @@
 {
   "name": "api-projet-gitflow",
   "version": "1.0.0",
+  "description": "API REST pour la gestion de projets étudiants",
+  "main": "dist/server.js",
   "scripts": {
+    "start": "node dist/server.js",
+    "dev": "ts-node src/server.ts",
+    "build": "tsc",
     "lint": "eslint . --ext .js,.ts,.tsx --max-warnings=0",
-    "start": "node src/server.js",
-    "dev": "nodemon src/server.ts"
+    "lint-staged": "lint-staged",
+    "format": "prettier --write .",
+    "pre-commit": "npm run lint-staged"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "express": "^4.18.2",
+    "zod": "^3.22.4"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.21",
+    "@types/node": "^20.10.6",
+    "@typescript-eslint/eslint-plugin": "^6.16.0",
+    "@typescript-eslint/parser": "^6.16.0",
+    "eslint": "^8.56.0",
+    "eslint-config-prettier": "^9.1.0",
+    "husky": "^8.0.3",
+    "lint-staged": "^15.2.0",
+    "prettier": "^3.1.1",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.3.3"
+  },
+  "lint-staged": {
+    "*.{js,ts,tsx}": [
+      "eslint --fix",
+      "prettier --write"
+    ]
   }
 }
