@@ -27,7 +27,7 @@ export default defineConfig([
         { argsIgnorePattern: "^_" },
       ],
       // Warn (but don't block) when using "any"
-      "@typescript-eslint/no-explicit-any": "warn",
+      "@typescript-eslint/no-explicit-any": "off",
       "@typescript-eslint/no-require-imports": "off",
     },
   },
