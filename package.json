@@ -1,48 +1,9 @@
 {
   "name": "api-projet-gitflow",
   "version": "1.0.0",
-  "description": "",
-  "main": "src/server.ts",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "dev": "nodemon src/server.ts",
-    "build": "tsc",
-    "start": "ts-node src/server.ts",
-    "lint": "echo '===================================================' && echo '❌ BLOCAGE : Capture en cours' && echo '===================================================' && exit 1"
-  },
-  "repository": {
-    "type": "git",
-    "url": "git+ssh://git@github.com/FoumaneDonald/b3-api-projet-gitflow.git"
-  },
-  "author": "",
-  "license": "ISC",
-  "bugs": {
-    "url": "https://github.com/FoumaneDonald/b3-api-projet-gitflow/issues"
-  },
-  "homepage": "https://github.com/FoumaneDonald/b3-api-projet-gitflow#readme",
-  "devDependencies": {
-    "@eslint/js": "^9.39.1",
-    "@types/cors": "^2.8.19",
-    "@types/express": "^5.0.5",
-    "@types/node": "^24.10.0",
-    "@typescript-eslint/eslint-plugin": "^8.46.3",
-    "@typescript-eslint/parser": "^8.46.3",
-    "eslint": "^9.39.1",
-    "eslint-config-prettier": "^10.1.8",
-    "eslint-plugin-prettier": "^5.5.4",
-    "globals": "^16.5.0",
-    "husky": "^9.1.7",
-    "jiti": "^2.6.1",
-    "lint-staged": "^16.2.6",
-    "prettier": "3.6.2",
-    "ts-node": "^10.9.2",
-    "typescript": "^5.9.3",
-    "typescript-eslint": "^8.46.3"
-  },
-  "dependencies": {
-    "cors": "^2.8.5",
-    "express": "^5.1.0",
-    "nodemon": "^3.1.10",
-    "zod": "^4.1.12"
+    "lint": "eslint . --ext .js,.ts,.tsx --max-warnings=0",
+    "start": "node src/server.js",
+    "dev": "nodemon src/server.ts"
   }
 }
