@@ -13,7 +13,7 @@
   },
   "lint-staged": {
     "*.{ts,tsx,js,jsx}": [
-      "eslint --max-warnings=0",
+      "eslint --max-warnings=0 --fix",
       "prettier --check"
     ]
   },
@@ -47,6 +47,7 @@
     "typescript-eslint": "^8.46.3"
   },
   "dependencies": {
+    "body-parser": "^2.2.0",
     "cors": "^2.8.5",
     "express": "^5.1.0",
     "nodemon": "^3.1.10",
