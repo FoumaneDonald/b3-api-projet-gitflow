@@ -1,0 +1,14 @@
+[
+  {
+    "id": "1",
+    "name": "Projet A",
+    "description": "Description du projet A",
+    "grade": 16
+  },
+  {
+    "id": "2",
+    "name": "Projet B",
+    "description": "Description du projet B",
+    "grade": null
+  }
+]

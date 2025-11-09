@@ -12,9 +12,9 @@
     "prepare": "husky"
   },
   "lint-staged": {
-    "*.{ts,tsx,js,jsx}": [
-      "eslint --max-warnings=0",
-      "prettier --check"
+    "src/**/*.{ts,tsx,js,jsx}": [
+      "eslint --fix",
+      "prettier --write"
     ]
   },
   "repository": {
@@ -52,11 +52,5 @@
     "express": "^5.1.0",
     "nodemon": "^3.1.10",
     "zod": "^4.1.12"
-  },
-  "lint-staged": {
-    "src/**/*.{ts,tsx,js,jsx}": [
-      "eslint --fix",
-      "prettier --write"
-    ]
   }
 }
