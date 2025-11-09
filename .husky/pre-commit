@@ -1,0 +1,17 @@
+#!/usr/bin/env sh
+. "$(dirname -- "$0")/_/husky.sh"
+
+echo "🔍 Vérification du code avec ESLint..."
+
+npm run lint
+
+if [ $? -ne 0 ]; then
+  echo ""
+  echo "❌ =========================================="
+  echo "❌ ERREUR : Le commit est BLOQUÉ !"
+  echo "❌ =========================================="
+  echo ""
+  exit 1
+fi
+
+echo "✅ Code validé, commit autorisé !"

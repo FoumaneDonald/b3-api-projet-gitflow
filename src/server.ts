@@ -1,16 +1,14 @@
 import express from "express";
-import cors from "cors";
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-app.use(cors());
 app.use(express.json());
 
 app.get("/", (req, res) => {
-  res.send("hello");
+  res.json({ message: "API fonctionne" });
 });
 
 app.listen(PORT, () => {
-  console.log(`Server is running on port ${PORT}`);
+  console.log(`Serveur démarré sur le port ${PORT}`);
 });
