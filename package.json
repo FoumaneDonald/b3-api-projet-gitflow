@@ -10,7 +10,8 @@
     "start": "ts-node src/server.ts",
     "lint": "eslint",
     "prepare": "husky",
-    "lint-staged": "lint-staged"
+    "lint-staged": "lint-staged",
+    "format": "prettier --write ."
   },
   "lint-staged": {
     "*.{ts,tsx,js,jsx}": [
