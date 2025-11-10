@@ -40,32 +40,60 @@ jobs:
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: |
-          echo "🧠 Envoi du diff à l'IA..."
-          RESPONSE=$(curl -s "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions" \
-            -H "Content-Type: application/json" \
-            -H "Authorization: Bearer $GEMINI_API_KEY" \
-            -d @- <<EOF
-          {
-            "model": "gemini-2.0-flash",
-            "messages": [
-              {
-                "role": "user",
-                "content": "Tu es un relecteur de code expert. Voici un diff encodé en Base64. Décode-le puis analyse le code comme d'habitude (en français).\n\nDiff Base64:\n${{ steps.diff.outputs.diff_b64 }}"
-              }
-            ]
-          }
-          EOF
-          )
-
-          echo "DEBUG LLM RESPONSE:"
-          echo "$RESPONSE"
-
-          FEEDBACK=$(echo "$RESPONSE" | grep -oP '"content":\s*"\K(.*)(?=")' | head -n 1 | sed 's/\\n/\n/g')
-
-          if [ -z "$FEEDBACK" ]; then
-            echo "⚠️ Aucun retour utile de l'IA."
+          echo "🧠 Lecture du diff..."
+          
+          if [ ! -f diff.txt ] || [ ! -s diff.txt ]; then
+            echo "⚠️ Aucun diff trouvé."
+            echo "LLM_RESPONSE=" >> $GITHUB_OUTPUT
+            exit 0
           fi
 
+          # Paramètres de chunking
+          CHUNK_SIZE=300
+          echo "" > llm_feedback.txt
+
+          # Découper le diff en chunks
+          split -l $CHUNK_SIZE diff.txt diff_chunk_
+
+          for file in diff_chunk_*
+          do
+            echo "🧠 Envoi du chunk $file à l'IA..."
+
+            RESPONSE=$(curl -s "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions" \
+              -H "Content-Type: application/json" \
+              -H "Authorization: Bearer $GEMINI_API_KEY" \
+              -d @- <<EOF
+            {
+              "model": "gemini-2.0-flash",
+              "messages": [
+                {
+                  "role": "user",
+                  "content": "Tu es un relecteur de code expert. Analyse ce diff. Si le code est bon, fournis des pistes d'amélioration. Si le code contient des bugs, liste-les. Réponds en français.\n\n$(cat $file)"
+                }
+              ]
+            }
+          EOF
+            )
+
+            # Vérifier si l'IA a renvoyé une erreur
+            ERROR=$(echo "$RESPONSE" | jq -r '.[0].error.message // empty')
+            if [ -n "$ERROR" ]; then
+              echo "⚠️ LLM error: $ERROR"
+              echo "LLM_RESPONSE=Erreur LLM : $ERROR" >> $GITHUB_OUTPUT
+              exit 0
+            fi
+
+            # Extraction du texte propre depuis le JSON
+            FEEDBACK=$(echo "$RESPONSE" | jq -r '.[0].message.content' 2>/dev/null || echo "")
+
+            echo -e "\n--- Chunk $file ---\n$FEEDBACK" >> llm_feedback.txt
+
+            # Pause pour éviter le 429
+            sleep 5
+          done
+
+          # Exporter le feedback complet
+          FEEDBACK=$(cat llm_feedback.txt)
           echo "LLM_RESPONSE<<EOF" >> $GITHUB_OUTPUT
           echo "$FEEDBACK" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
