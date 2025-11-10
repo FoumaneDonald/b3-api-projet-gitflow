@@ -1,0 +1,25 @@
+{
+  "projects": [
+    {
+      "id": 1,
+      "name": "Plateforme de gestion d'étudiants",
+      "description": "Application web permettant de gérer les étudiants, les cours et les notes.",
+      "status": "soumis",
+      "author": "Alice"
+    },
+    {
+      "id": 2,
+      "name": "API de gestion de projets",
+      "description": "API REST en Node.js pour gérer des projets et leurs états.",
+      "status": "soumis",
+      "author": "Bob"
+    },
+    {
+      "id": 3,
+      "name": "Application mobile de suivi de santé",
+      "description": "Application Flutter pour suivre les habitudes alimentaires et sportives.",
+      "status": "en cours de validation",
+      "author": "Charlie"
+    }
+  ]
+}
