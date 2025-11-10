@@ -41,53 +41,40 @@ jobs:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: |
           echo "🧠 Lecture du diff..."
-          
+
           if [ ! -f diff.txt ] || [ ! -s diff.txt ]; then
             echo "⚠️ Aucun diff trouvé."
             echo "LLM_RESPONSE=" >> $GITHUB_OUTPUT
             exit 0
           fi
 
-          CHUNK_SIZE=300
-          echo "" > llm_feedback.txt
-          split -l $CHUNK_SIZE diff.txt diff_chunk_
+          # Encode the diff in Base64
+          DIFF_B64=$(base64 -w 0 diff.txt)
 
-          for file in diff_chunk_*
-          do
-            echo "🧠 Envoi du chunk $file à l'IA..."
-
-            # Échapper le diff en JSON
-            DIFF_JSON=$(jq -Rs . < "$file")
-
-            RESPONSE=$(curl -s "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions" \
-              -H "Content-Type: application/json" \
-              -H "Authorization: Bearer $GEMINI_API_KEY" \
-              -d @- <<EOF
+          RESPONSE=$(curl -s "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions" \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Bearer $GEMINI_API_KEY" \
+            -d @- <<EOF
           {
             "model": "gemini-2.0-flash",
             "messages": [
               {
                 "role": "user",
-                "content": "Tu es un relecteur de code expert. Analyse ce diff. Si le code est bon, fournis des pistes d'amélioration. Si le code contient des bugs, liste-les. Réponds en français.\n\n$DIFF_JSON"
+                "content": "Tu es un relecteur de code expert. Analyse ce diff encodé en Base64. Décodes-le d'abord côté IA et ensuite, si le code est bon, fournis des pistes d'amélioration. Si le code contient des bugs, liste-les. Réponds en français.\n\n$DIFF_B64"
               }
             ]
           }
           EOF
           )
 
-            ERROR=$(echo "$RESPONSE" | jq -r '.[0].error.message // empty')
-            if [ -n "$ERROR" ]; then
-              echo "⚠️ LLM error: $ERROR"
-              echo "LLM_RESPONSE=Erreur LLM : $ERROR" >> $GITHUB_OUTPUT
-              exit 0
-            fi
+          ERROR=$(echo "$RESPONSE" | jq -r '.[0].error.message // empty')
+          if [ -n "$ERROR" ]; then
+            echo "⚠️ LLM error: $ERROR"
+            echo "LLM_RESPONSE=Erreur LLM : $ERROR" >> $GITHUB_OUTPUT
+            exit 0
+          fi
 
-            FEEDBACK=$(echo "$RESPONSE" | jq -r '.[0].message.content' 2>/dev/null || echo "")
-            echo -e "\n--- Chunk $file ---\n$FEEDBACK" >> llm_feedback.txt
-            sleep 5
-          done
-
-          FEEDBACK=$(cat llm_feedback.txt)
+          FEEDBACK=$(echo "$RESPONSE" | jq -r '.[0].message.content' 2>/dev/null || echo "")
           echo "LLM_RESPONSE<<EOF" >> $GITHUB_OUTPUT
           echo "$FEEDBACK" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
