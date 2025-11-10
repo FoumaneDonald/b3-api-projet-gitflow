@@ -69,16 +69,19 @@ jobs:
         if: ${{ steps.llm.outputs.LLM_RESPONSE != '' }}
         uses: actions/github-script@v7
         with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
-            const feedback = `${{ steps.llm.outputs.LLM_RESPONSE }}`.trim();
+            const feedback = process.env.FEEDBACK;
             const prNumber = context.payload.pull_request.number;
             const actor = context.actor;
-            github.rest.issues.createComment({
+            await github.rest.issues.createComment({
               owner: context.repo.owner,
               repo: context.repo.repo,
               issue_number: prNumber,
               body: `🤖 **Revue IA pour @${actor}**\n\n${feedback}`
             });
+        env:
+          FEEDBACK: ${{ steps.llm.outputs.LLM_RESPONSE }}
 
       - name: Send Email Notification
         if: ${{ steps.llm.outputs.LLM_RESPONSE != '' }}
