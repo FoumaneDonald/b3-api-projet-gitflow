@@ -1,4 +1,4 @@
-name: 🤖 LLM Review & Smart Email
+name: LLM Review & Email Notification
 
 on:
   pull_request:
@@ -6,39 +6,32 @@ on:
     branches: [develop]
 
 jobs:
-  ai_review:
+  review_and_notify:
     runs-on: ubuntu-latest
-    name: AI Code Review & Email
-
-    env:
-      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-      MAIL_USERNAME: ${{ secrets.MAIL_USERNAME }}
-      MAIL_PASSWORD: ${{ secrets.MAIL_PASSWORD }}
-      TEAM_EMAIL_LIST: ${{ secrets.TEAM_EMAIL_LIST }}
-      LLM_API_URL: https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # 👈 Récupère tout l'historique Git
 
-            - name: Get PR diff (src only)
+      - name: Get PR diff (src only)
         id: diff
         run: |
           echo "🔍 Récupération du diff entre la PR et develop..."
           git fetch --all --prune --unshallow || true
-          
-          # S'assurer que la branche develop existe localement
+
+          # Vérifie si la branche develop existe
           if ! git rev-parse --verify origin/develop >/dev/null 2>&1; then
             echo "⚠️ La branche origin/develop n'existe pas encore sur ce dépôt."
             echo "diff=" >> $GITHUB_OUTPUT
             exit 0
           fi
-          
+
           git fetch origin develop
-          
-          # Tenter de récupérer le diff proprement
+
+          # Vérifie s'il existe une base commune entre develop et la PR
           if ! git merge-base --is-ancestor origin/develop HEAD; then
-            echo "⚠️ Pas de base commune entre develop et la PR, affichage du diff complet."
+            echo "⚠️ Pas de base commune, affichage du diff complet."
             git diff HEAD -- 'src/**' '*.js' '*.ts' > diff.txt
           else
             git diff origin/develop...HEAD -- 'src/**' '*.js' '*.ts' > diff.txt
@@ -55,75 +48,55 @@ jobs:
             echo "EOF" >> $GITHUB_OUTPUT
           fi
 
-
-      - name: Analyze diff with Gemini
-        id: gemini
+      - name: Call LLM for Code Review
+        id: llm
         if: ${{ steps.diff.outputs.diff != '' }}
         run: |
-          echo "🔍 Envoi du diff à Gemini..."
-          echo "${{ steps.diff.outputs.diff }}" | head -n 20
-          
-          RESPONSE=$(curl -s -X POST "$LLM_API_URL" \
+          echo "🧠 Envoi du diff à l'IA pour revue..."
+          RESPONSE=$(curl -s -X POST "https://api.example-llm.com/v1/analyze" \
             -H "Content-Type: application/json" \
-            -H "Authorization: Bearer $GEMINI_API_KEY" \
-            -d "{
-              'contents': [
-                {
-                  'parts': [
-                    {
-                      'text': 'Tu es un relecteur de code expert. Analyse ce diff:\n${{ steps.diff.outputs.diff }}\n\nRéponds en Markdown avec:\n✅ Résumé\n🔴 Problèmes\n💡 Suggestions.'
-                    }
-                  ]
-                }
-              ]
-            }")
-
-          echo "Réponse brute Gemini :"
-          echo "$RESPONSE" | head -c 500
-
-          REVIEW=$(echo "$RESPONSE" | jq -r '.candidates[0].content.parts[0].text // empty')
-
-          if [ -z "$REVIEW" ]; then
-            REVIEW="⚠️ Aucune réponse générée par Gemini (vérifie la clé API ou la requête)."
-          fi
-
-          echo "review<<EOF" >> $GITHUB_OUTPUT
-          echo "$REVIEW" >> $GITHUB_OUTPUT
+            -H "Authorization: Bearer ${{ secrets.GEMINI_API_KEY }}" \
+            -d @- <<EOF
+          {
+            "prompt": "Tu es un relecteur de code expert. Analyse ce diff et réponds en Markdown structuré avec trois sections : ✅ **Résumé**, 🔴 **Bugs détectés**, 💡 **Suggestions**. Réponds en français uniquement.\n\n${{ steps.diff.outputs.diff }}"
+          }
+          EOF
+          )
+          echo "LLM_RESPONSE<<EOF" >> $GITHUB_OUTPUT
+          echo "$RESPONSE" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
 
-      - name: Comment on PR
-        if: ${{ steps.diff.outputs.diff != '' }}
+      - name: Comment on PR with LLM feedback
+        if: ${{ steps.llm.outputs.LLM_RESPONSE != '' }}
         uses: actions/github-script@v7
         with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
-            const review = `${{ steps.gemini.outputs.review }}`;
-            const body = `🤖 **Revue IA (Gemini)** pour @${{ github.actor }}:\n\n${review}`;
+            const feedback = `${{ steps.llm.outputs.LLM_RESPONSE }}`;
+            const prNumber = context.payload.pull_request.number;
+            const actor = context.actor;
             github.rest.issues.createComment({
-              issue_number: context.issue.number,
               owner: context.repo.owner,
               repo: context.repo.repo,
-              body
+              issue_number: prNumber,
+              body: `🤖 **Revue IA pour @${actor}**\n\n${feedback}`
             });
 
-      - name: Send email to team
+      - name: Send Email Notification
+        if: ${{ steps.llm.outputs.LLM_RESPONSE != '' }}
         uses: dawidd6/action-send-mail@v3
         with:
           server_address: smtp.gmail.com
-          server_port: 587
+          server_port: 465
           username: ${{ secrets.MAIL_USERNAME }}
           password: ${{ secrets.MAIL_PASSWORD }}
-          subject: "Revue IA PR #${{ github.event.pull_request.number }} - @${{ github.actor }}"
+          subject: "Revue IA pour PR #${{ github.event.pull_request.number }} par @${{ github.actor }}"
           to: ${{ secrets.TEAM_EMAIL_LIST }}
-          from: "LLM Review Bot <${{ secrets.MAIL_USERNAME }}>"
+          from: ${{ secrets.MAIL_USERNAME }}
           body: |
-            Bonjour équipe 👋,
-
-            Une nouvelle Pull Request a été soumise par **@${{ github.actor }}**.
-
-            Voici la revue IA automatique :  
-
-            ${{ steps.gemini.outputs.review }}
-
-            🔗 Lien vers la PR : ${{ github.event.pull_request.html_url }}
-
+            Bonjour l'équipe 👋,
+            
+            Une nouvelle revue IA vient d'être générée pour la Pull Request #${{ github.event.pull_request.number }} par @${{ github.actor }}.
+            
+            Voici le retour de l'IA :
+            
+            ${{ steps.llm.outputs.LLM_RESPONSE }}
