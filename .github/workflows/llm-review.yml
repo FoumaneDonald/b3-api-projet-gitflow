@@ -1,4 +1,4 @@
-name: 🤖 LLM Code Review & Team Notification
+name: 🤖 LLM Review & Smart Email
 
 on:
   pull_request:
@@ -6,9 +6,9 @@ on:
     branches: [develop]
 
 jobs:
-  review_and_notify:
-    name: AI Review & Email
+  ai_review:
     runs-on: ubuntu-latest
+    name: AI Code Review & Email
 
     env:
       GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
@@ -18,31 +18,32 @@ jobs:
       LLM_API_URL: https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent
 
     steps:
-      - name: Checkout repository
+      - name: Checkout code
         uses: actions/checkout@v4
 
-      # 1️⃣ Récupérer uniquement le diff des fichiers pertinents (ex: src/**)
-      - name: Get relevant diff
+      - name: Get PR diff (src only)
         id: diff
         run: |
           git fetch origin develop
-          git diff origin/develop...HEAD -- 'src/**' '*.ts' '*.js' > diff.txt
+          git diff origin/develop...HEAD -- 'src/**' '*.js' '*.ts' > diff.txt
 
           if [ ! -s diff.txt ]; then
-            echo "Aucun fichier pertinent modifié, rien à envoyer au LLM."
             echo "diff=" >> $GITHUB_OUTPUT
+            echo "Aucun diff pertinent trouvé."
           else
             echo "diff<<EOF" >> $GITHUB_OUTPUT
             cat diff.txt >> $GITHUB_OUTPUT
             echo "EOF" >> $GITHUB_OUTPUT
           fi
 
-      # 2️⃣ Appel à l'API Gemini pour analyse
-      - name: Call Gemini API for code review
-        id: call_llm
+      - name: Analyze diff with Gemini
+        id: gemini
         if: ${{ steps.diff.outputs.diff != '' }}
         run: |
-          REVIEW=$(curl -s -X POST "$LLM_API_URL" \
+          echo "🔍 Envoi du diff à Gemini..."
+          echo "${{ steps.diff.outputs.diff }}" | head -n 20
+          
+          RESPONSE=$(curl -s -X POST "$LLM_API_URL" \
             -H "Content-Type: application/json" \
             -H "Authorization: Bearer $GEMINI_API_KEY" \
             -d "{
@@ -50,29 +51,34 @@ jobs:
                 {
                   'parts': [
                     {
-                      'text': 'Tu es un relecteur de code expert. Analyse le diff suivant :\n${{ steps.diff.outputs.diff }}\n\nRéponds en format Markdown structuré :\n\n✅ **Résumé général**\n🔴 **Problèmes identifiés**\n💡 **Suggestions d’amélioration**\n\nSois précis et concis, en français.'
+                      'text': 'Tu es un relecteur de code expert. Analyse ce diff:\n${{ steps.diff.outputs.diff }}\n\nRéponds en Markdown avec:\n✅ Résumé\n🔴 Problèmes\n💡 Suggestions.'
                     }
                   ]
                 }
               ]
-            }" | jq -r '.candidates[0].content.parts[0].text')
+            }")
+
+          echo "Réponse brute Gemini :"
+          echo "$RESPONSE" | head -c 500
+
+          REVIEW=$(echo "$RESPONSE" | jq -r '.candidates[0].content.parts[0].text // empty')
 
           if [ -z "$REVIEW" ]; then
-            REVIEW="⚠️ L’analyse LLM n’a pas retourné de résultat."
+            REVIEW="⚠️ Aucune réponse générée par Gemini (vérifie la clé API ou la requête)."
           fi
 
           echo "review<<EOF" >> $GITHUB_OUTPUT
           echo "$REVIEW" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
 
-      # 3️⃣ Commentaire automatique sur la Pull Request
-      - name: Comment on Pull Request
+      - name: Comment on PR
+        if: ${{ steps.diff.outputs.diff != '' }}
         uses: actions/github-script@v7
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
-            const review = `${{ steps.call_llm.outputs.review }}`;
-            const body = `🤖 **Revue automatique par IA (Gemini)** pour @${{ github.actor }} :\n\n${review}`;
+            const review = `${{ steps.gemini.outputs.review }}`;
+            const body = `🤖 **Revue IA (Gemini)** pour @${{ github.actor }}:\n\n${review}`;
             github.rest.issues.createComment({
               issue_number: context.issue.number,
               owner: context.repo.owner,
@@ -80,24 +86,24 @@ jobs:
               body
             });
 
-      # 4️⃣ Envoi d'email à toute l'équipe
-      - name: Send email notification
+      - name: Send email to team
         uses: dawidd6/action-send-mail@v3
         with:
           server_address: smtp.gmail.com
           server_port: 587
           username: ${{ secrets.MAIL_USERNAME }}
           password: ${{ secrets.MAIL_PASSWORD }}
-          subject: "Revue IA - PR #${{ github.event.pull_request.number }} par @${{ github.actor }}"
+          subject: "Revue IA PR #${{ github.event.pull_request.number }} - @${{ github.actor }}"
           to: ${{ secrets.TEAM_EMAIL_LIST }}
           from: "LLM Review Bot <${{ secrets.MAIL_USERNAME }}>"
           body: |
             Bonjour équipe 👋,
 
-            Une nouvelle Pull Request vient d’être ouverte par **@${{ github.actor }}**.
+            Une nouvelle Pull Request a été soumise par **@${{ github.actor }}**.
 
-            Voici la revue générée automatiquement par l’IA 🤖 :
+            Voici la revue IA automatique :  
 
-            ${{ steps.call_llm.outputs.review }}
+            ${{ steps.gemini.outputs.review }}
 
-            ➤ Lien vers la PR : ${{ github.event.pull_request.html_url }}
+            🔗 Lien vers la PR : ${{ github.event.pull_request.html_url }}
+
