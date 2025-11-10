@@ -53,7 +53,7 @@ jobs:
         if: ${{ steps.diff.outputs.diff != '' }}
         run: |
           echo "🧠 Envoi du diff à l'IA pour revue..."
-          RESPONSE=$(curl -s -X POST "https://api.example-llm.com/v1/analyze" \
+          RESPONSE=$(curl -s -X POST "https://generativelanguage.googleapis.com/v1beta/{model=models/*}:generateContent" \
             -H "Content-Type: application/json" \
             -H "Authorization: Bearer ${{ secrets.GEMINI_API_KEY }}" \
             -d @- <<EOF
