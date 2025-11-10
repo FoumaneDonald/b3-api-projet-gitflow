@@ -9,7 +9,9 @@
     "build": "tsc",
     "start": "ts-node src/server.ts",
     "lint": "eslint",
-    "prepare": "husky"
+    "prepare": "husky",
+    "lint-staged": "lint-staged",
+    "format": "prettier --write ."
   },
   "lint-staged": {
     "*.{ts,tsx,js,jsx}": [
@@ -52,11 +54,5 @@
     "express": "^5.1.0",
     "nodemon": "^3.1.10",
     "zod": "^4.1.12"
-  },
-  "lint-staged": {
-    "src/**/*.{ts,tsx,js,jsx}": [
-      "eslint --fix",
-      "prettier --write"
-    ]
   }
 }
