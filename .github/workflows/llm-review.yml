@@ -12,7 +12,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0  # 👈 Récupère tout l'historique Git
+          fetch-depth: 0  # Récupère tout l'historique Git
 
       - name: Get PR diff (src only)
         id: diff
@@ -29,7 +29,7 @@ jobs:
 
           git fetch origin develop
 
-          # Vérifie s'il existe une base commune entre develop et la PR
+          # Vérifie s'il existe une base commune
           if ! git merge-base --is-ancestor origin/develop HEAD; then
             echo "⚠️ Pas de base commune, affichage du diff complet."
             git diff HEAD -- 'src/**' '*.js' '*.ts' > diff.txt
@@ -50,7 +50,6 @@ jobs:
 
       - name: Call LLM for Code Review
         id: llm
-        if: ${{ steps.diff.outputs.diff != '' }}
         run: |
           echo "🧠 Envoi du diff à l'IA pour revue..."
           RESPONSE=$(curl -s -X POST "https://generativelanguage.googleapis.com/v1beta/{model=models/*}:generateContent" \
@@ -67,22 +66,27 @@ jobs:
           echo "EOF" >> $GITHUB_OUTPUT
 
       - name: Comment on PR with LLM feedback
-        if: ${{ steps.llm.outputs.LLM_RESPONSE != '' }}
+        if: always()
         uses: actions/github-script@v7
         with:
           script: |
-            const feedback = `${{ steps.llm.outputs.LLM_RESPONSE }}`;
-            const prNumber = context.payload.pull_request.number;
-            const actor = context.actor;
-            github.rest.issues.createComment({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: prNumber,
-              body: `🤖 **Revue IA pour @${actor}**\n\n${feedback}`
-            });
+            const feedback = `${{ steps.llm.outputs.LLM_RESPONSE }}`.trim();
+            if(feedback === "") {
+              console.log("⚠️ Aucun retour de l'IA, aucun commentaire ajouté.");
+            } else {
+              const prNumber = context.payload.pull_request.number;
+              const actor = context.actor;
+              github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: prNumber,
+                body: `🤖 **Revue IA pour @${actor}**\n\n${feedback}`
+              });
+              console.log("✅ Commentaire IA ajouté sur la PR.");
+            }
 
       - name: Send Email Notification
-        if: ${{ steps.llm.outputs.LLM_RESPONSE != '' }}
+        if: always()
         uses: dawidd6/action-send-mail@v3
         with:
           server_address: smtp.gmail.com
