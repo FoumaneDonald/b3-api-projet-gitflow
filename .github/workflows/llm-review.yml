@@ -12,32 +12,20 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0  # Récupère tout l'historique Git
+          fetch-depth: 0
 
       - name: Get PR diff (src only)
         id: diff
         run: |
-          echo "🔍 Récupération du diff entre la PR et develop..."
+          echo "🔍 Récupération du diff..."
           git fetch --all --prune --unshallow || true
-
-          if ! git rev-parse --verify origin/develop >/dev/null 2>&1; then
-            echo "⚠️ La branche origin/develop n'existe pas encore sur ce dépôt."
-            echo "diff=" >> $GITHUB_OUTPUT
-            exit 0
-          fi
-
-          git fetch origin develop
-
-          if ! git merge-base --is-ancestor origin/develop HEAD; then
-            git diff HEAD -- 'src/**' '*.js' '*.ts' > diff.txt
-          else
-            git diff origin/develop...HEAD -- 'src/**' '*.js' '*.ts' > diff.txt
-          fi
-
+          git fetch origin develop || true
+          git diff origin/develop...HEAD -- 'src/**' '*.js' '*.ts' > diff.txt || true
           if [ ! -s diff.txt ]; then
-            echo "Aucun changement détecté dans src/"
             echo "diff=" >> $GITHUB_OUTPUT
           else
+            echo "✅ Diff récupéré :"
+            head -n 10 diff.txt
             echo "diff<<EOF" >> $GITHUB_OUTPUT
             cat diff.txt >> $GITHUB_OUTPUT
             echo "EOF" >> $GITHUB_OUTPUT
@@ -46,69 +34,57 @@ jobs:
       - name: Call LLM for Code Review
         id: llm
         run: |
-          echo "🧠 Envoi du diff à l'IA pour revue..."
-          # URL codée directement
-          LLM_API_URL="https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
-          RESPONSE=$(curl -s -X POST "$LLM_API_URL" \
+          echo "🧠 Envoi du diff à l'IA..."
+          RESPONSE=$(curl -s -X POST "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent" \
             -H "Content-Type: application/json" \
+            -H "Authorization: Bearer ${{ secrets.GEMINI_API_KEY }}" \
             -d @- <<EOF
           {
-            "prompt": "Tu es un relecteur de code expert. Analyse ce diff et réponds en Markdown structuré avec trois sections : ✅ **Résumé**, 🔴 **Bugs détectés**, 💡 **Suggestions**. Réponds en français uniquement.\n\n${{ steps.diff.outputs.diff }}"
+            "contents": [{"parts":[{"text":"Tu es un relecteur de code expert. Analyse ce diff et réponds en Markdown structuré : ✅ Résumé, 🔴 Bugs détectés, 💡 Suggestions. Réponds en français uniquement.\n\n${{ steps.diff.outputs.diff }}"}]}]
           }
           EOF
           )
+          echo "DEBUG LLM RESPONSE:"
+          echo "$RESPONSE"
+
+          # Extraction du texte propre depuis le JSON Gemini
+          FEEDBACK=$(echo "$RESPONSE" | grep -oP '"text":\s*"\K([^"]+)' | head -n 1 | sed 's/\\n/\n/g')
+
           echo "LLM_RESPONSE<<EOF" >> $GITHUB_OUTPUT
-          echo "$RESPONSE" >> $GITHUB_OUTPUT
+          echo "$FEEDBACK" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
 
       - name: Comment on PR with LLM feedback
-        if: always()
+        if: ${{ steps.llm.outputs.LLM_RESPONSE != '' }}
         uses: actions/github-script@v7
         with:
           script: |
             const feedback = `${{ steps.llm.outputs.LLM_RESPONSE }}`.trim();
-            if(feedback === "") {
-              console.log("⚠️ Aucun retour de l'IA, aucun commentaire ajouté.");
-            } else {
-              const prNumber = context.payload.pull_request.number;
-              const actor = context.actor;
-              github.rest.issues.createComment({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                issue_number: prNumber,
-                body: `🤖 **Revue IA pour @${actor}**\n\n${feedback}`
-              });
-              console.log("✅ Commentaire IA ajouté sur la PR.");
-            }
+            const prNumber = context.payload.pull_request.number;
+            const actor = context.actor;
+            github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: prNumber,
+              body: `🤖 **Revue IA pour @${actor}**\n\n${feedback}`
+            });
 
       - name: Send Email Notification
-        if: always()
-        run: |
-          FEEDBACK="${{ steps.llm.outputs.LLM_RESPONSE }}"
+        if: ${{ steps.llm.outputs.LLM_RESPONSE != '' }}
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 465
+          username: ${{ secrets.MAIL_USERNAME }}
+          password: ${{ secrets.MAIL_PASSWORD }}
+          subject: "Revue IA pour PR #${{ github.event.pull_request.number }} par @${{ github.actor }}"
+          to: ${{ secrets.TEAM_EMAIL_LIST }}
+          from: ${{ secrets.MAIL_USERNAME }}
+          body: |
+            Bonjour l'équipe 👋,
 
-          if [ -z "$FEEDBACK" ]; then
-            echo "⚠️ Aucun retour IA, email non envoyé."
-            exit 0
-          fi
+            Une nouvelle revue IA vient d'être générée pour la Pull Request #${{ github.event.pull_request.number }} par @${{ github.actor }}.
 
-          echo "📨 Envoi du mail avec le feedback complet de l'IA..."
+            Voici le retour de l'IA :
 
-          MAIL_BODY=$(mktemp)
-          echo "Bonjour l'équipe 👋," >> $MAIL_BODY
-          echo "" >> $MAIL_BODY
-          echo "Une nouvelle revue IA vient d'être générée pour la Pull Request #${{ github.event.pull_request.number }} par @${{ github.actor }}." >> $MAIL_BODY
-          echo "" >> $MAIL_BODY
-          echo "Voici le retour complet de l'IA :" >> $MAIL_BODY
-          echo "" >> $MAIL_BODY
-          echo "$FEEDBACK" >> $MAIL_BODY
-
-          cat $MAIL_BODY | mail -s "Revue IA pour PR #${{ github.event.pull_request.number }} par @${{ github.actor }}" \
-            -r "${{ secrets.MAIL_USERNAME }}" \
-            -S smtp="smtp.gmail.com:465" \
-            -S smtp-auth=login \
-            -S smtp-auth-user="${{ secrets.MAIL_USERNAME }}" \
-            -S smtp-auth-password="${{ secrets.MAIL_PASSWORD }}" \
-            -S ssl-verify=ignore \
-            ${{ secrets.TEAM_EMAIL_LIST }}
-
-          echo "✅ Email envoyé avec succès."
+            ${{ steps.llm.outputs.LLM_RESPONSE }}
