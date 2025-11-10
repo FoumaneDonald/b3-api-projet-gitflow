@@ -2,7 +2,7 @@ import { z } from "zod";
 
 // ✅ Schéma Zod pour un projet
 export const ProjectSchema = z.object({
-  id: z.uuid(),
+  id: z.string(),
   title: z.string(),
   description: z.string(),
   grade: z.number().min(0).max(20).optional(),
