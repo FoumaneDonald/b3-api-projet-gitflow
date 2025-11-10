@@ -1,0 +1,23 @@
+[
+  {
+    "id": "a1b2c3d4-e5f6-7890-1234-567890abcdef",
+    "studentName": "Alice Dupont",
+    "course": "JavaScript",
+    "githubUrl": "https://github.com/alice/projet-js",
+    "grade": 18
+  },
+  {
+    "id": "b2c3d4e5-f6a7-8901-2345-67890abcdef1",
+    "studentName": "Bob Martin",
+    "course": "TypeScript",
+    "githubUrl": "https://github.com/bob/projet-ts",
+    "grade": 16
+  },
+  {
+    "id": "c3d4e5f6-a7b8-9012-3456-7890abcdef2",
+    "studentName": "Charlie Brown",
+    "course": "JavaScript",
+    "githubUrl": "https://github.com/charlie/projet-js-2",
+    "grade": null
+  }
+]
