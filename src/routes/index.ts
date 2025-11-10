@@ -1,12 +1,8 @@
-const express = require("express");
+import express from "express";
+import projectRoutes from "./projects";
+
 const router = express.Router();
-const consultRoute = require("./projects");
 
-router.get("/", (req: any, res: any) => {
-  res.send("Welcome");
-});
+router.use("/projects", projectRoutes);
 
-router.use("/project", consultRoute);
-// router.use("/auth", authRoute);
-
-module.exports = router;
+export default router;
