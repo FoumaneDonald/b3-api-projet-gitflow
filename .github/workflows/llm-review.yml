@@ -48,7 +48,7 @@ jobs:
         run: |
           echo "🧠 Envoi du diff à l'IA pour revue..."
           # URL codée directement
-          LLM_API_URL="https://generativelanguage.googleapis.com/v1beta/{model=models/*}:generateContent"
+          LLM_API_URL="https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
           RESPONSE=$(curl -s -X POST "$LLM_API_URL" \
             -H "Content-Type: application/json" \
             -d @- <<EOF
