@@ -48,7 +48,6 @@ jobs:
             exit 0
           fi
 
-          # Encode the diff in Base64
           DIFF_B64=$(base64 -w 0 diff.txt)
 
           RESPONSE=$(curl -s "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions" \
@@ -67,14 +66,7 @@ jobs:
           EOF
           )
 
-          ERROR=$(echo "$RESPONSE" | jq -r '.[0].error.message // empty')
-          if [ -n "$ERROR" ]; then
-            echo "⚠️ LLM error: $ERROR"
-            echo "LLM_RESPONSE=Erreur LLM : $ERROR" >> $GITHUB_OUTPUT
-            exit 0
-          fi
-
-          FEEDBACK=$(echo "$RESPONSE" | jq -r '.[0].message.content' 2>/dev/null || echo "")
+          FEEDBACK=$(echo "$RESPONSE" | jq -r '.choices[0].message.content // ""')
           echo "LLM_RESPONSE<<EOF" >> $GITHUB_OUTPUT
           echo "$FEEDBACK" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
