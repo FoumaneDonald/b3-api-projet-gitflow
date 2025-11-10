@@ -20,7 +20,6 @@ jobs:
           echo "🔍 Récupération du diff entre la PR et develop..."
           git fetch --all --prune --unshallow || true
 
-          # Vérifie si la branche develop existe
           if ! git rev-parse --verify origin/develop >/dev/null 2>&1; then
             echo "⚠️ La branche origin/develop n'existe pas encore sur ce dépôt."
             echo "diff=" >> $GITHUB_OUTPUT
@@ -29,9 +28,7 @@ jobs:
 
           git fetch origin develop
 
-          # Vérifie s'il existe une base commune
           if ! git merge-base --is-ancestor origin/develop HEAD; then
-            echo "⚠️ Pas de base commune, affichage du diff complet."
             git diff HEAD -- 'src/**' '*.js' '*.ts' > diff.txt
           else
             git diff origin/develop...HEAD -- 'src/**' '*.js' '*.ts' > diff.txt
@@ -41,8 +38,6 @@ jobs:
             echo "Aucun changement détecté dans src/"
             echo "diff=" >> $GITHUB_OUTPUT
           else
-            echo "✅ Diff récupéré avec succès :"
-            head -n 20 diff.txt
             echo "diff<<EOF" >> $GITHUB_OUTPUT
             cat diff.txt >> $GITHUB_OUTPUT
             echo "EOF" >> $GITHUB_OUTPUT
@@ -52,9 +47,10 @@ jobs:
         id: llm
         run: |
           echo "🧠 Envoi du diff à l'IA pour revue..."
-          RESPONSE=$(curl -s -X POST "https://generativelanguage.googleapis.com/v1beta/{model=models/*}:generateContent" \
+          # URL codée directement
+          LLM_API_URL="https://generativelanguage.googleapis.com/v1beta/{model=models/*}:generateContent"
+          RESPONSE=$(curl -s -X POST "$LLM_API_URL" \
             -H "Content-Type: application/json" \
-            -H "Authorization: Bearer ${{ secrets.GEMINI_API_KEY }}" \
             -d @- <<EOF
           {
             "prompt": "Tu es un relecteur de code expert. Analyse ce diff et réponds en Markdown structuré avec trois sections : ✅ **Résumé**, 🔴 **Bugs détectés**, 💡 **Suggestions**. Réponds en français uniquement.\n\n${{ steps.diff.outputs.diff }}"
@@ -87,20 +83,32 @@ jobs:
 
       - name: Send Email Notification
         if: always()
-        uses: dawidd6/action-send-mail@v3
-        with:
-          server_address: smtp.gmail.com
-          server_port: 465
-          username: ${{ secrets.MAIL_USERNAME }}
-          password: ${{ secrets.MAIL_PASSWORD }}
-          subject: "Revue IA pour PR #${{ github.event.pull_request.number }} par @${{ github.actor }}"
-          to: ${{ secrets.TEAM_EMAIL_LIST }}
-          from: ${{ secrets.MAIL_USERNAME }}
-          body: |
-            Bonjour l'équipe 👋,
-            
-            Une nouvelle revue IA vient d'être générée pour la Pull Request #${{ github.event.pull_request.number }} par @${{ github.actor }}.
-            
-            Voici le retour de l'IA :
-            
-            ${{ steps.llm.outputs.LLM_RESPONSE }}
+        run: |
+          FEEDBACK="${{ steps.llm.outputs.LLM_RESPONSE }}"
+
+          if [ -z "$FEEDBACK" ]; then
+            echo "⚠️ Aucun retour IA, email non envoyé."
+            exit 0
+          fi
+
+          echo "📨 Envoi du mail avec le feedback complet de l'IA..."
+
+          MAIL_BODY=$(mktemp)
+          echo "Bonjour l'équipe 👋," >> $MAIL_BODY
+          echo "" >> $MAIL_BODY
+          echo "Une nouvelle revue IA vient d'être générée pour la Pull Request #${{ github.event.pull_request.number }} par @${{ github.actor }}." >> $MAIL_BODY
+          echo "" >> $MAIL_BODY
+          echo "Voici le retour complet de l'IA :" >> $MAIL_BODY
+          echo "" >> $MAIL_BODY
+          echo "$FEEDBACK" >> $MAIL_BODY
+
+          cat $MAIL_BODY | mail -s "Revue IA pour PR #${{ github.event.pull_request.number }} par @${{ github.actor }}" \
+            -r "${{ secrets.MAIL_USERNAME }}" \
+            -S smtp="smtp.gmail.com:465" \
+            -S smtp-auth=login \
+            -S smtp-auth-user="${{ secrets.MAIL_USERNAME }}" \
+            -S smtp-auth-password="${{ secrets.MAIL_PASSWORD }}" \
+            -S ssl-verify=ignore \
+            ${{ secrets.TEAM_EMAIL_LIST }}
+
+          echo "✅ Email envoyé avec succès."
