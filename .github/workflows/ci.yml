@@ -2,13 +2,9 @@ name: CI - Basic Checks
 
 # 🔁 Déclenchement automatique du workflow
 on:
-  # Quand on pousse du code sur develop ou ta branche feature
-  push:
-    branches:
-      - develop
-      - feature/filter-project-by-courses
   # Quand on crée une pull request vers develop
   pull_request:
+    types: [opened, synchronize]
     branches:
       - develop
 
