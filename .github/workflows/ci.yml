@@ -6,7 +6,7 @@ on:
   push:
     branches:
       - develop
-      - feature/get-project-details
+      - feature/filter-project-by-courses
   # Quand on crée une pull request vers develop
   pull_request:
     branches:
