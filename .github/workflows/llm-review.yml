@@ -25,6 +25,7 @@ jobs:
           echo "🔍 Récupération du diff..."
           git fetch origin develop || true
           git diff origin/develop...HEAD -- 'src/**' '*.js' '*.ts' > diff.txt || true
+          
           if [ ! -s diff.txt ]; then
             echo "diff=" >> $GITHUB_OUTPUT
           else
@@ -62,70 +63,3 @@ jobs:
             RESPONSE=$(curl -s "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions" \
               -H "Content-Type: application/json" \
               -H "Authorization: Bearer $GEMINI_API_KEY" \
-              -d @- <<EOF
-                {
-                  "model": "gemini-2.0-flash",
-                  "messages": [
-                    {
-                      "role": "user",
-                      "content": "Tu es un relecteur de code expert. Analyse ce diff. Si le code est bon, fournis des pistes d'amélioration. Si le code contient des bugs, liste-les. Réponds en français.\n\n$DIFF_JSON"
-                    }
-                  ]
-                }
-                EOF
-                )
-
-            ERROR=$(echo "$RESPONSE" | jq -r '.[0].error.message // empty')
-            if [ -n "$ERROR" ]; then
-              echo "⚠️ LLM error: $ERROR"
-              echo "LLM_RESPONSE=Erreur LLM : $ERROR" >> $GITHUB_OUTPUT
-              exit 0
-            fi
-
-            FEEDBACK=$(echo "$RESPONSE" | jq -r '.[0].message.content' 2>/dev/null || echo "")
-            echo -e "\n--- Chunk $file ---\n$FEEDBACK" >> llm_feedback.txt
-            sleep 5
-          done
-
-          FEEDBACK=$(cat llm_feedback.txt)
-          echo "LLM_RESPONSE<<EOF" >> $GITHUB_OUTPUT
-          echo "$FEEDBACK" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
-
-      - name: Comment on PR with LLM feedback
-        if: ${{ steps.llm.outputs.LLM_RESPONSE != '' }}
-        uses: actions/github-script@v7
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          script: |
-            const feedback = process.env.FEEDBACK;
-            const prNumber = context.payload.pull_request.number;
-            const actor = context.actor;
-            await github.rest.issues.createComment({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: prNumber,
-              body: `🤖 **Revue IA pour @${actor}**\n\n${feedback}`
-            });
-        env:
-          FEEDBACK: ${{ steps.llm.outputs.LLM_RESPONSE }}
-
-      - name: Send Email Notification
-        if: ${{ steps.llm.outputs.LLM_RESPONSE != '' }}
-        uses: dawidd6/action-send-mail@v3
-        with:
-          server_address: smtp.gmail.com
-          server_port: 465
-          username: ${{ secrets.MAIL_USERNAME }}
-          password: ${{ secrets.MAIL_PASSWORD }}
-          subject: "Revue IA pour PR #${{ github.event.pull_request.number }} par @${{ github.actor }}"
-          to: ${{ secrets.TEAM_EMAIL_LIST }}
-          from: ${{ secrets.MAIL_USERNAME }}
-          body: |
-            Bonjour l'équipe 👋,
-
-            Une nouvelle revue IA vient d'être générée pour la Pull Request #${{ github.event.pull_request.number }} par @${{ github.actor }}.
-
-            Voici le retour de l'IA :
-
-            ${{ steps.llm.outputs.LLM_RESPONSE }}
