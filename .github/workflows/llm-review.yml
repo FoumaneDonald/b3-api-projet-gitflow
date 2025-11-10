@@ -21,20 +21,40 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Get PR diff (src only)
+            - name: Get PR diff (src only)
         id: diff
         run: |
+          echo "🔍 Récupération du diff entre la PR et develop..."
+          git fetch --all --prune --unshallow || true
+          
+          # S'assurer que la branche develop existe localement
+          if ! git rev-parse --verify origin/develop >/dev/null 2>&1; then
+            echo "⚠️ La branche origin/develop n'existe pas encore sur ce dépôt."
+            echo "diff=" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          
           git fetch origin develop
-          git diff origin/develop...HEAD -- 'src/**' '*.js' '*.ts' > diff.txt
+          
+          # Tenter de récupérer le diff proprement
+          if ! git merge-base --is-ancestor origin/develop HEAD; then
+            echo "⚠️ Pas de base commune entre develop et la PR, affichage du diff complet."
+            git diff HEAD -- 'src/**' '*.js' '*.ts' > diff.txt
+          else
+            git diff origin/develop...HEAD -- 'src/**' '*.js' '*.ts' > diff.txt
+          fi
 
           if [ ! -s diff.txt ]; then
+            echo "Aucun changement détecté dans src/"
             echo "diff=" >> $GITHUB_OUTPUT
-            echo "Aucun diff pertinent trouvé."
           else
+            echo "✅ Diff récupéré avec succès :"
+            head -n 20 diff.txt
             echo "diff<<EOF" >> $GITHUB_OUTPUT
             cat diff.txt >> $GITHUB_OUTPUT
             echo "EOF" >> $GITHUB_OUTPUT
           fi
+
 
       - name: Analyze diff with Gemini
         id: gemini
