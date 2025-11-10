@@ -18,7 +18,6 @@ jobs:
         id: diff
         run: |
           echo "🔍 Récupération du diff..."
-          git fetch --all --prune --unshallow || true
           git fetch origin develop || true
           git diff origin/develop...HEAD -- 'src/**' '*.js' '*.ts' > diff.txt || true
           if [ ! -s diff.txt ]; then
@@ -37,21 +36,28 @@ jobs:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: |
           echo "🧠 Envoi du diff à l'IA..."
-          RESPONSE=$(curl "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions" \
+          RESPONSE=$(curl -s "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions" \
             -H "Content-Type: application/json" \
-            -H "Authorization: Bearer ${{ secrets.GEMINI_API_KEY }}" \
+            -H "Authorization: Bearer $GEMINI_API_KEY" \
             -d @- <<EOF
           {
             "model": "gemini-2.0-flash",
-            "messages": [{"role": "user", "content": "Tu es un relecteur de code expert. Analyse ce diff. Si le code est bon, fournis des pistes d'amélioration. Si le code contient des bugs, liste-les. Réponds en français."}]
+            "messages": [
+              {"role": "user", "content": "Tu es un relecteur de code expert. Analyse ce diff en français :\n\n${{ steps.diff.outputs.diff }}"}
+            ]
           }
           EOF
           )
+
           echo "DEBUG LLM RESPONSE:"
           echo "$RESPONSE"
 
-          # Extraction du texte propre depuis le JSON Gemini
-          FEEDBACK=$(echo "$RESPONSE" | grep -oP '"text":\s*"\K([^"]+)' | head -n 1 | sed 's/\\n/\n/g')
+          # Extraire le champ content proprement depuis le JSON Gemini
+          FEEDBACK=$(echo "$RESPONSE" | grep -oP '"content":\s*"\K(.*)(?=")' | head -n 1 | sed 's/\\n/\n/g')
+
+          if [ -z "$FEEDBACK" ]; then
+            echo "⚠️ Aucun retour utile de l'IA."
+          fi
 
           echo "LLM_RESPONSE<<EOF" >> $GITHUB_OUTPUT
           echo "$FEEDBACK" >> $GITHUB_OUTPUT
