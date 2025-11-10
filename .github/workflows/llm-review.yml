@@ -63,17 +63,17 @@ jobs:
               -H "Content-Type: application/json" \
               -H "Authorization: Bearer $GEMINI_API_KEY" \
               -d @- <<EOF
-            {
-              "model": "gemini-2.0-flash",
-              "messages": [
-                {
-                  "role": "user",
-                  "content": "Tu es un relecteur de code expert. Analyse ce diff. Si le code est bon, fournis des pistes d'amélioration. Si le code contient des bugs, liste-les. Réponds en français.\n\n$DIFF_JSON"
-                }
-              ]
-            }
-            EOF
-            )
+              {
+                "model": "gemini-2.0-flash",
+                "messages": [
+                  {
+                    "role": "user",
+                    "content": "Tu es un relecteur de code expert. Analyse ce diff. Si le code est bon, fournis des pistes d'amélioration. Si le code contient des bugs, liste-les. Réponds en français.\n\n$DIFF_JSON"
+                  }
+                ]
+              }
+              EOF
+              )
 
             ERROR=$(echo "$RESPONSE" | jq -r '.[0].error.message // empty')
             if [ -n "$ERROR" ]; then
